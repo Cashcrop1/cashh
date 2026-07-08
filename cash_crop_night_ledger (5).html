@@ -1,0 +1,1310 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Cash Crop — Night Ledger</title>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;0,700;1,500;1,600&family=Outfit:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+<style>
+  :root{
+    --bg:            #0A0908;
+    --bg-raised:     #131210;
+    --bg-card:       #17140F;
+    --hairline:      #2C271C;
+    --hairline-soft: #201C15;
+    --text:          #ECE3D2;
+    --text-dim:      #A79C87;
+    --text-faint:    #6E6555;
+    --amber:         #E2993B;
+    --amber-dim:     rgba(226,153,59,0.14);
+    --ember:         #C1451F;
+    --ember-dim:     rgba(193,69,31,0.15);
+    --jade:          #3E9C85;
+    --jade-dim:      rgba(62,156,133,0.14);
+    --font-display:  'Cormorant Garamond', Georgia, serif;
+    --font-body:     'Outfit', sans-serif;
+    --font-mono:     'JetBrains Mono', monospace;
+    --ease: cubic-bezier(0.22, 1, 0.36, 1);
+    --speed: 0.35s;
+  }
+
+  .bg-orb{ position:fixed; border-radius:50%; filter:blur(90px); pointer-events:none; z-index:-1; transform:translateZ(0); }
+  .bg-orb.amber{ width:440px; height:440px; top:-140px; left:-160px; background:var(--amber); opacity:0.14; animation: drift1 24s ease-in-out infinite; }
+  .bg-orb.jade{ width:380px; height:380px; bottom:-160px; right:-120px; background:var(--jade); opacity:0.12; animation: drift2 28s ease-in-out infinite; }
+  @keyframes drift1{ 0%,100%{ transform:translate3d(0,0,0) scale(1); } 50%{ transform:translate3d(70px,50px,0) scale(1.12); } }
+  @keyframes drift2{ 0%,100%{ transform:translate3d(0,0,0) scale(1); } 50%{ transform:translate3d(-60px,-40px,0) scale(1.08); } }
+  @media (prefers-reduced-motion: reduce){
+    :root{ --speed: 0s !important; }
+    .reveal{ opacity:1 !important; transform:none !important; transition:none !important; }
+    .bg-orb{ animation:none !important; }
+    .seal-face{ animation:none !important; }
+  }
+
+  *{ box-sizing:border-box; margin:0; padding:0; }
+
+  body{
+    background:
+      radial-gradient(ellipse 900px 500px at 15% -10%, rgba(226,153,59,0.06), transparent 60%),
+      radial-gradient(ellipse 700px 500px at 100% 10%, rgba(62,156,133,0.05), transparent 55%),
+      var(--bg);
+    color: var(--text);
+    font-family: var(--font-body);
+    line-height: 1.6;
+    overflow-x: hidden;
+    cursor: none;
+  }
+  a, button, select, input, label, textarea{ cursor: none; }
+
+  #ember-canvas{
+    position: fixed; inset:0; width:100%; height:100%;
+    pointer-events:none; z-index:9999;
+  }
+
+  ::selection{ background: var(--amber-dim); color: var(--amber); }
+
+  .grain{
+    background-image: repeating-linear-gradient(0deg, rgba(236,227,210,0.025) 0px, transparent 1px, transparent 3px);
+  }
+
+  h1,h2,h3,h4{ font-family: var(--font-display); font-weight:600; color: var(--text); letter-spacing:0.01em; }
+  .mono{ font-family: var(--font-mono); }
+  .eyebrow{
+    font-family: var(--font-mono); font-size:0.72rem; letter-spacing:0.14em; text-transform:uppercase;
+    color: var(--amber); display:block; margin-bottom:0.6rem;
+  }
+
+  *:focus-visible{ outline:2px dashed var(--amber); outline-offset:4px; }
+
+  /* ---- HEADER / NAV ---- */
+  header{
+    background: linear-gradient(180deg, rgba(19,18,16,0.97), rgba(19,18,16,0.9));
+    border-bottom: 1px solid var(--hairline);
+    position: sticky; top:0; z-index:100;
+    backdrop-filter: blur(8px);
+  }
+  .nav-container{
+    max-width: 1180px; margin:0 auto;
+    display:flex; justify-content:space-between; align-items:center;
+    padding: 1rem 1.25rem;
+  }
+  .brand{ display:flex; align-items:center; gap:0.7rem; text-decoration:none; }
+  .brand-mark{
+    width:34px; height:34px; border-radius:50%;
+    border:1.5px solid var(--amber);
+    display:flex; align-items:center; justify-content:center;
+    font-family: var(--font-display); font-weight:700; color:var(--amber); font-size:1.05rem;
+    box-shadow: 0 0 14px rgba(226,153,59,0.25);
+  }
+  .brand-text{ display:flex; flex-direction:column; line-height:1.15; }
+  .brand-text strong{ font-family:var(--font-display); font-size:1.15rem; color:var(--text); }
+  .brand-text span{ font-family:var(--font-mono); font-size:0.68rem; letter-spacing:0.08em; color:var(--text-faint); text-transform:uppercase; }
+
+  nav{ display:flex; gap:0.25rem; flex-wrap:wrap; }
+  .nav-tab{
+    background:transparent; color:var(--text-dim); text-decoration:none;
+    padding:0.55rem 1rem; font-weight:500; font-size:0.88rem;
+    border:1px solid transparent; border-radius:100px;
+    transition: background var(--speed) var(--ease), color var(--speed) var(--ease), border-color var(--speed) var(--ease);
+  }
+  .nav-tab:hover{ color:var(--text); background: rgba(236,227,210,0.05); }
+  .nav-tab.active{ color: var(--amber); border-color: var(--amber-dim); background: var(--amber-dim); font-weight:600; }
+
+  main{ max-width:1180px; margin:0 auto; padding: 2.5rem 1.25rem 4rem; }
+  .section-panel{ display:none; }
+  .section-panel.active{ display:block; }
+
+  .reveal{ opacity:0; transform: perspective(1000px) rotateX(14deg) translateY(28px); transition: transform 0.8s var(--ease), opacity 0.8s var(--ease); transform-origin: center bottom; }
+  .reveal.visible{ opacity:1; transform: perspective(1000px) rotateX(0deg) translateY(0); }
+
+  /* ---- HERO ---- */
+  .hero{
+    position:relative; padding: 3.5rem 2rem; margin-bottom: 3rem;
+    border:1px solid var(--hairline); border-radius:10px;
+    background: linear-gradient(160deg, rgba(226,153,59,0.05), transparent 55%), var(--bg-raised);
+    overflow:hidden;
+  }
+  .hero::after{
+    content:''; position:absolute; inset:0; pointer-events:none;
+    background-image: radial-gradient(rgba(226,153,59,0.5) 0.6px, transparent 0.6px);
+    background-size: 22px 22px; opacity:0.05;
+  }
+  .hero-grid{ display:grid; grid-template-columns: 1.4fr 1fr; gap:2rem; align-items:center; position:relative; z-index:2; }
+  @media (max-width:850px){ .hero-grid{ grid-template-columns:1fr; } }
+
+  .hero h1{ font-size:2.85rem; font-weight:500; line-height:1.2; margin-bottom:1.25rem; opacity:0; transform:translateY(18px); }
+  .hero h1 em{ color: var(--amber); font-style:italic; }
+  .hero p{ font-size:1.08rem; color:var(--text-dim); max-width:560px; margin-bottom:1.75rem; opacity:0; transform:translateY(18px); }
+  .hero-ctas{ display:flex; gap:0.85rem; flex-wrap:wrap; opacity:0; transform:translateY(18px); }
+
+  .btn{
+    display:inline-flex; align-items:center; justify-content:center; gap:0.4rem;
+    padding:0.78rem 1.5rem; font-family:var(--font-body); font-size:0.95rem; font-weight:600;
+    text-decoration:none; border-radius:8px; border:1px solid var(--hairline);
+    transition: transform var(--speed) var(--ease), box-shadow var(--speed) var(--ease), border-color var(--speed) var(--ease), background var(--speed) var(--ease);
+    background: transparent; color: var(--text);
+  }
+  .btn:hover{ transform: translateY(-2px); border-color: var(--amber); }
+  .btn:active{ transform: translateY(1px) scale(0.97); }
+  .btn-primary{ background: var(--amber); color:#1B1408; border-color:var(--amber); }
+  .btn-primary:hover{ box-shadow: 0 8px 24px rgba(226,153,59,0.25); }
+  .btn-ghost{ background:transparent; color:var(--text-dim); }
+  .btn-small{ padding:0.5rem 1rem; font-size:0.82rem; }
+
+  /* Lantern seal (signature element) — a 3D medallion, not a flat badge */
+  .lantern-seal{
+    position:relative; width:170px; height:170px; margin:0 auto;
+    border-radius:50%; border:2px solid var(--amber);
+    font-family:var(--font-mono); text-align:center; color:var(--amber);
+    background: radial-gradient(circle, rgba(226,153,59,0.12), transparent 70%);
+    transform: scale(0); transition: transform 0.6s cubic-bezier(0.175,0.885,0.32,1.275);
+    transform-style: preserve-3d;
+  }
+  .lantern-seal.lit{ transform:scale(1); }
+  .lantern-seal.pulse .seal-face{ animation: seal-pulse 0.3s var(--ease), seal-idle 6s ease-in-out 0.3s infinite; }
+  @keyframes seal-pulse{
+    0%{ transform: perspective(700px) rotateY(0deg) scale(1); }
+    50%{ transform: perspective(700px) rotateY(0deg) scale(0.88); box-shadow:0 0 30px rgba(226,153,59,0.4); }
+    100%{ transform: perspective(700px) rotateY(0deg) scale(1); }
+  }
+  .seal-face{
+    position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center;
+    transform-style: preserve-3d; animation: seal-idle 6s ease-in-out infinite;
+  }
+  @keyframes seal-idle{
+    0%,100%{ transform: perspective(700px) rotateY(-9deg) rotateX(2deg); }
+    50%{ transform: perspective(700px) rotateY(9deg) rotateX(-2deg); }
+  }
+  .lantern-seal span{ font-size:0.68rem; text-transform:uppercase; letter-spacing:0.1em; color:var(--text-faint); }
+  .lantern-seal .seal-value{ font-size:1.6rem; font-weight:700; color:var(--amber); margin:2px 0; }
+  .lantern-seal::before{
+    content:''; position:absolute; inset:8px; border-radius:50%; border:1px dashed rgba(226,153,59,0.35);
+  }
+
+  /* ---- CARDS ---- */
+  .ledger-card{
+    border:1px solid var(--hairline); border-radius:10px; padding:1.75rem;
+    background: var(--bg-card); position:relative;
+    box-shadow:
+      3px 4px 0 1px var(--bg-raised),
+      6px 8px 0 2px var(--hairline-soft),
+      0 18px 34px rgba(0,0,0,0.45);
+    transform-style: preserve-3d; will-change: transform;
+    transition: transform 0.15s ease-out, box-shadow 0.3s var(--ease), border-color var(--speed) var(--ease);
+  }
+  .ledger-card:hover{ border-color: rgba(226,153,59,0.4); }
+  .card-title{
+    font-size:1.35rem; margin-bottom:1.4rem; padding-bottom:0.75rem;
+    border-bottom:1px solid var(--hairline); color:var(--text);
+  }
+
+  .calculator-layout{ display:grid; grid-template-columns:1fr 1fr; gap:1.75rem; margin-bottom:2.5rem; }
+  @media (max-width:850px){ .calculator-layout{ grid-template-columns:1fr; } }
+
+  .form-group{ margin-bottom:1.15rem; }
+  .form-group label{ display:block; font-weight:600; margin-bottom:0.4rem; font-size:0.88rem; color:var(--text-dim); }
+  .input-wrapper{ position:relative; display:flex; align-items:center; }
+  .input-prefix{ position:absolute; left:12px; font-family:var(--font-mono); color:var(--text-faint); }
+  .form-group input, .form-group select, .form-group textarea{
+    width:100%; padding:0.7rem 0.7rem 0.7rem 30px; border:1px solid var(--hairline);
+    background: var(--bg-raised); font-family:var(--font-body); font-size:0.98rem; border-radius:6px; color:var(--text);
+    transition: border-color var(--speed) var(--ease);
+  }
+  .form-group select{ padding-left:12px; }
+  .form-group input:focus, .form-group select:focus, .form-group textarea:focus{ border-color: var(--amber); }
+
+  .toggle-container{ display:flex; border:1px solid var(--hairline); border-radius:6px; overflow:hidden; margin-top:0.5rem; }
+  .toggle-btn{ flex:1; border:none; padding:0.6rem; background:var(--bg-raised); color:var(--text-dim); font-family:var(--font-body); font-weight:600; font-size:0.85rem; transition: background var(--speed), color var(--speed); }
+  .toggle-btn.active{ background: var(--amber); color:#1B1408; }
+
+  .outputs-list{ display:flex; flex-direction:column; gap:0.9rem; margin-top:0.5rem; }
+  .output-row{ display:flex; justify-content:space-between; align-items:center; padding-bottom:0.6rem; border-bottom:1px solid var(--hairline-soft); }
+  .output-label{ font-weight:500; color:var(--text-dim); font-size:0.92rem; }
+  .output-value{ font-family:var(--font-mono); font-size:1.25rem; font-weight:600; color:var(--text); }
+  .output-row.total-payable{ border-bottom:2px double var(--hairline); padding-bottom:0.8rem; }
+  .output-row.total-payable .output-value{ font-size:1.55rem; color:var(--ember); }
+
+  .note-line{ margin-top:1.4rem; font-size:0.85rem; font-style:italic; color:var(--text-faint); }
+
+  .debtfree-strip{
+    margin-top:1.25rem; padding:0.9rem 1rem; border:1px dashed var(--jade); border-radius:8px;
+    background: var(--jade-dim); font-size:0.9rem; color:var(--text);
+  }
+  .debtfree-strip strong{ color: var(--jade); }
+
+  /* ---- SCHEDULE TOGGLE ---- */
+  .schedule-toggle-row{ display:flex; justify-content:flex-end; margin-top:1rem; }
+  #schedule-wrap{ overflow:hidden; max-height:0; transition:max-height 0.5s var(--ease); }
+  #schedule-wrap.open{ max-height:2400px; }
+  .schedule-inner{ padding-top:1.25rem; border-top:1px solid var(--hairline); margin-top:1.25rem; }
+
+  /* ---- TABLES ---- */
+  .table-container{ overflow-x:auto; margin-top:1rem; }
+  table{ width:100%; border-collapse:collapse; text-align:left; }
+  th{ background: var(--bg-raised); color:var(--amber); padding:0.7rem 1rem; font-family:var(--font-mono); font-weight:600; font-size:0.78rem; text-transform:uppercase; letter-spacing:0.04em; border-bottom:1px solid var(--hairline); }
+  td{ padding:0.8rem 1rem; border-bottom:1px solid var(--hairline-soft); font-size:0.92rem; color:var(--text); }
+  tr.highlight-cheapest td{ background: var(--jade-dim); }
+  tr.highlight-expensive td{ background: var(--ember-dim); }
+
+  .badge{ display:inline-block; padding:0.2rem 0.55rem; font-size:0.68rem; font-weight:700; text-transform:uppercase; border-radius:4px; font-family:var(--font-mono); letter-spacing:0.03em; }
+  .badge-green{ background: var(--jade); color:#04150F; }
+  .badge-red{ background: var(--ember); color:#1B0800; }
+  .badge-neutral{ background: var(--hairline); color:var(--text-dim); }
+
+  /* ---- CHART ---- */
+  .chart-card{ margin-top:1.75rem; }
+  #payoff-chart{ width:100%; height:260px; display:block; }
+  .chart-legend{ display:flex; gap:1.25rem; flex-wrap:wrap; margin-top:0.75rem; font-size:0.8rem; color:var(--text-dim); }
+  .chart-legend span{ display:inline-flex; align-items:center; gap:0.4rem; }
+  .swatch{ width:10px; height:10px; border-radius:2px; display:inline-block; }
+
+  /* ---- LESSON GRID ---- */
+  .grid-layout{ display:grid; grid-template-columns:repeat(auto-fill, minmax(300px,1fr)); gap:1.5rem; margin-top:1.5rem; }
+  .lesson-card{ border:1px solid var(--hairline); border-radius:10px; background:var(--bg-card); overflow:hidden; display:flex; flex-direction:column; transform-style:preserve-3d; will-change:transform; transition: transform 0.15s ease-out, border-color var(--speed) var(--ease); }
+  .lesson-card:hover{ border-color: var(--amber); }
+  .video-placeholder{ width:100%; aspect-ratio:16/9; background: var(--bg-raised); position:relative; display:flex; align-items:center; justify-content:center; border-bottom:1px solid var(--hairline); }
+  .video-placeholder::before{ content:''; position:absolute; inset:0; background-image: radial-gradient(rgba(226,153,59,0.35) 0.6px, transparent 0.6px); background-size:16px 16px; opacity:0.4; }
+  .play-btn{ width:48px; height:48px; border-radius:50%; background: var(--bg-card); border:1.5px solid var(--amber); display:flex; align-items:center; justify-content:center; z-index:2; transition: transform var(--speed) var(--ease), background var(--speed) var(--ease); }
+  .play-btn::after{ content:''; width:0; height:0; border-top:7px solid transparent; border-bottom:7px solid transparent; border-left:12px solid var(--amber); margin-left:3px; }
+  .lesson-card:hover .play-btn{ transform:scale(1.12); background: var(--amber-dim); }
+  .lesson-body{ padding:1.15rem; flex-grow:1; display:flex; flex-direction:column; }
+  .lesson-body h3{ font-size:1.15rem; margin-bottom:0.5rem; }
+  .lesson-body p{ font-size:0.88rem; color:var(--text-dim); margin-bottom:1.1rem; }
+  .lesson-link{ margin-top:auto; font-weight:600; font-size:0.86rem; color:var(--amber); text-decoration:none; }
+  .lesson-link:hover{ text-decoration:underline; }
+
+  /* ---- GLOSSARY ---- */
+  .glossary-search{ position:relative; max-width:420px; margin: 1.25rem 0 2rem; }
+  .glossary-search input{
+    width:100%; padding:0.8rem 1rem 0.8rem 2.4rem; border:1px solid var(--hairline); border-radius:8px;
+    background: var(--bg-raised); color:var(--text); font-family:var(--font-body); font-size:0.95rem;
+  }
+  .glossary-search input:focus{ border-color:var(--amber); }
+  .glossary-search::before{
+    content:'⌕'; position:absolute; left:0.85rem; top:50%; transform:translateY(-50%); color:var(--text-faint); font-size:1.1rem;
+  }
+  .glossary-count{ font-size:0.82rem; color:var(--text-faint); margin-bottom:1rem; font-family:var(--font-mono); }
+  .glossary-grid{ display:grid; grid-template-columns:repeat(auto-fill, minmax(300px,1fr)); gap:1.1rem; }
+  .term-card{ border:1px solid var(--hairline); border-radius:10px; background:var(--bg-card); padding:1.25rem 1.4rem; transform-style:preserve-3d; will-change:transform; transition: transform 0.15s ease-out, border-color var(--speed); }
+  .term-card:hover{ border-color: var(--amber); }
+  .term-card .term-name{ font-family:var(--font-display); font-size:1.15rem; color:var(--amber); margin-bottom:0.5rem; }
+  .term-card .term-tag{ font-family:var(--font-mono); font-size:0.68rem; color:var(--text-faint); text-transform:uppercase; letter-spacing:0.05em; display:block; margin-bottom:0.35rem; }
+  .term-card p{ font-size:0.9rem; color:var(--text-dim); }
+  .term-card.hidden{ display:none; }
+  .glossary-empty{ text-align:center; padding:3rem 1rem; color:var(--text-faint); font-style:italic; display:none; }
+
+  /* ---- BUDGET ---- */
+  .budget-grid{ display:grid; grid-template-columns:340px 1fr; gap:1.75rem; }
+  @media (max-width:850px){ .budget-grid{ grid-template-columns:1fr; } }
+  .budget-toolbar{ display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem; flex-wrap:wrap; gap:0.6rem; }
+  .bar-comparison-track{ width:100%; height:10px; background: var(--hairline); border-radius:5px; position:relative; overflow:hidden; margin-top:4px; }
+  .bar-fill-estimated{ position:absolute; left:0; top:0; height:100%; background: var(--amber); opacity:0.35; z-index:1; }
+  .bar-fill-actual{ position:absolute; left:0; top:0; height:100%; background: var(--jade); z-index:2; border-radius:5px 0 0 5px; }
+  .bar-fill-actual.over-budget{ background: var(--ember); }
+  .empty-state{ text-align:center; padding:2.5rem 1rem; color:var(--text-faint); font-style:italic; }
+  .btn-delete{ background:transparent; border:none; color:var(--ember); font-family:var(--font-mono); font-weight:bold; padding:0.2rem 0.5rem; }
+  .btn-delete:hover{ text-decoration:underline; }
+  .saved-tag{ font-family:var(--font-mono); font-size:0.72rem; color:var(--jade); opacity:0; transition:opacity 0.3s var(--ease); }
+  .saved-tag.show{ opacity:1; }
+
+  /* ---- FUNDRAISER ---- */
+  .fund-panel{ position:relative; min-height:65vh; display:flex; align-items:center; justify-content:center; overflow:hidden; border-radius:12px; }
+  .fund-bg-scene{ position:absolute; inset:0; overflow:hidden; pointer-events:none; z-index:0; }
+  .float-icon{
+    position:absolute; bottom:-10%; opacity:0;
+    filter: drop-shadow(0 0 12px rgba(226,153,59,0.3));
+    animation-name: floatDrift; animation-timing-function: ease-in-out; animation-iteration-count: infinite;
+  }
+  @keyframes floatDrift{
+    0%   { transform: translate(0,0) rotate(0deg); opacity:0; }
+    8%   { opacity:0.55; }
+    50%  { transform: translate(24px,-48vh) rotate(12deg); opacity:0.55; }
+    92%  { opacity:0.35; }
+    100% { transform: translate(-16px,-98vh) rotate(-10deg); opacity:0; }
+  }
+  @media (prefers-reduced-motion: reduce){ .float-icon{ animation:none !important; opacity:0.35 !important; } }
+  .fundraiser-container{ position:relative; z-index:2; max-width:800px; margin:0 auto; text-align:center; }
+  .progress-box{ background:var(--bg-card); border:1px solid var(--hairline); padding:1.75rem; border-radius:10px; margin:2rem 0; }
+  .progress-bar-outer{ width:100%; height:20px; background:var(--hairline); border-radius:10px; overflow:hidden; margin:1rem 0; }
+  .progress-bar-inner{ height:100%; width:0%; background: linear-gradient(90deg, var(--amber), var(--jade)); transition: width 1.2s cubic-bezier(0.1,0.8,0.2,1); }
+  .tier-layout{ display:grid; grid-template-columns:repeat(3,1fr); gap:1.4rem; margin-top:2rem; }
+  @media (max-width:750px){ .tier-layout{ grid-template-columns:1fr; } }
+  .tier-card{ border:1px dashed var(--hairline); padding:1.4rem; background:var(--bg-card); border-radius:10px; display:flex; flex-direction:column; align-items:center; transform-style:preserve-3d; will-change:transform; transition: transform 0.15s ease-out, border-color var(--speed); }
+  .tier-price{ font-family:var(--font-mono); font-size:1.6rem; font-weight:700; color:var(--amber); margin:0.5rem 0; }
+
+  /* ---- FAQ ---- */
+  .faq-layout{ max-width:800px; margin:0 auto 3rem; }
+  .accordion-item{ border-bottom:1px solid var(--hairline); }
+  .accordion-trigger{ width:100%; background:none; border:none; display:flex; justify-content:space-between; align-items:center; padding:1.2rem 0; font-family:var(--font-display); font-size:1.12rem; font-weight:600; text-align:left; color:var(--text); }
+  .accordion-icon{ font-family:var(--font-mono); font-size:1.3rem; font-weight:400; color:var(--amber); transition: transform var(--speed) var(--ease); }
+  .accordion-content{ max-height:0; overflow:hidden; transition: max-height var(--speed) var(--ease); }
+  .accordion-content p{ padding-bottom:1.2rem; font-size:0.92rem; color:var(--text-dim); }
+  .accordion-item.open .accordion-icon{ transform:rotate(45deg); }
+  .contact-form-box{ max-width:600px; margin:0 auto; }
+
+  footer{ border-top:1px solid var(--hairline); background: var(--bg-raised); padding:2.25rem 1.25rem; margin-top:4rem; font-size:0.82rem; text-align:center; color:var(--text-faint); }
+  .footer-content{ max-width:800px; margin:0 auto; }
+  .disclaimer{ border:1px dashed var(--ember); padding:1rem; border-radius:8px; background: var(--ember-dim); margin-top:1.4rem; text-align:left; color:var(--text-dim); }
+</style>
+</head>
+<body>
+
+<div class="bg-orb amber"></div>
+<div class="bg-orb jade"></div>
+<canvas id="ember-canvas"></canvas>
+
+<header>
+  <div class="nav-container">
+    <a href="#home" class="brand" onclick="switchTab('home')">
+      <span class="brand-mark">₹</span>
+      <span class="brand-text"><strong>Cash Crop</strong><span>Night Ledger</span></span>
+    </a>
+    <nav role="tablist">
+      <a href="#home" id="tab-home" class="nav-tab active" role="tab" onclick="switchTab('home')">Passbook</a>
+      <a href="#learn" id="tab-learn" class="nav-tab" role="tab" onclick="switchTab('learn')">Lessons</a>
+      <a href="#glossary" id="tab-glossary" class="nav-tab" role="tab" onclick="switchTab('glossary')">Glossary</a>
+      <a href="#budget" id="tab-budget" class="nav-tab" role="tab" onclick="switchTab('budget')">Daily Ledger</a>
+      <a href="#fund" id="tab-fund" class="nav-tab" role="tab" onclick="switchTab('fund')">Support Us</a>
+      <a href="#help" id="tab-help" class="nav-tab" role="tab" onclick="switchTab('help')">Help Desk</a>
+    </nav>
+  </div>
+</header>
+
+<main>
+
+  <!-- ================= HOME PANEL ================= -->
+  <div id="panel-home" class="section-panel active">
+    <section class="hero">
+      <div class="hero-grid">
+        <div>
+          <span class="eyebrow">Every loan, checked twice</span>
+          <h1 id="hero-headline">There's the interest rate they <em>quote</em> you, and the rupees you <em>actually</em> hand over.</h1>
+          <p id="hero-subtext">Don't sign away next season for a quick fix today. Work out the real cost of any loan, see a month-by-month payoff plan, and spot which lenders are safe before you sign anything.</p>
+          <div class="hero-ctas" id="hero-actions">
+            <a href="#calculator-target" class="btn btn-primary" onclick="document.getElementById('calculator-target').scrollIntoView({behavior:'smooth'})">Work Out the Real Cost</a>
+            <a href="#lenders-target" class="btn btn-ghost" onclick="document.getElementById('lenders-target').scrollIntoView({behavior:'smooth'})">Compare Lenders</a>
+          </div>
+        </div>
+        <div class="lantern-seal" id="hero-stamp">
+          <div class="seal-face">
+            <span>Real Cost</span>
+            <div class="seal-value" id="stamp-pct">+0%</div>
+            <span>Above Principal</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <div class="calculator-layout" id="calculator-target">
+      <div class="ledger-card reveal">
+        <h2 class="card-title">1 · Tell us about the loan</h2>
+
+        <div class="form-group">
+          <label for="calc-amount">How much are you borrowing?</label>
+          <div class="input-wrapper">
+            <span class="input-prefix">₹</span>
+            <input type="number" id="calc-amount" value="50000" min="1000" step="500">
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="calc-rate">Interest rate they quoted (per year)</label>
+          <div class="input-wrapper">
+            <span class="input-prefix">%</span>
+            <input type="number" id="calc-rate" value="14" min="1" max="200" step="0.5">
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="calc-tenure">How many months to repay?</label>
+          <div class="input-wrapper">
+            <span class="input-prefix">M</span>
+            <input type="number" id="calc-tenure" value="12" min="1" max="120">
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label>How is interest charged?</label>
+          <div class="toggle-container">
+            <button class="toggle-btn active" id="type-reducing" onclick="setCalcMethod('reducing')">Reducing Balance</button>
+            <button class="toggle-btn" id="type-flat" onclick="setCalcMethod('flat')">Flat Rate</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="ledger-card reveal">
+        <h2 class="card-title">2 · What you'll really pay</h2>
+
+        <div class="outputs-list">
+          <div class="output-row">
+            <span class="output-label">Every month, you pay</span>
+            <span class="output-value" id="out-emi">₹0</span>
+          </div>
+          <div class="output-row">
+            <span class="output-label">Total interest, added up</span>
+            <span class="output-value" id="out-interest">₹0</span>
+          </div>
+          <div class="output-row total-payable">
+            <span class="output-label">Total money out of your pocket</span>
+            <span class="output-value" id="out-total">₹0</span>
+          </div>
+        </div>
+
+        <div class="debtfree-strip" id="debtfree-strip">
+          Start this month and you'll be <strong>debt-free by <span id="debtfree-date">—</span></strong>.
+        </div>
+
+        <div class="note-line">
+          A flat rate keeps charging interest on money you've already paid back. Reducing balance only charges interest on what you still owe — that's usually the cheaper, fairer deal. Not sure what these mean? Check the <a href="#glossary" onclick="switchTab('glossary')" style="color:var(--amber);">Glossary</a>.
+        </div>
+
+        <div class="schedule-toggle-row">
+          <button class="btn btn-ghost btn-small" onclick="toggleSchedule()" id="schedule-btn">Show month-by-month schedule ▾</button>
+        </div>
+        <div id="schedule-wrap">
+          <div class="schedule-inner">
+            <div class="table-container">
+              <table>
+                <thead>
+                  <tr><th>Month</th><th>Payment</th><th>Interest</th><th>Principal</th><th>Balance Left</th></tr>
+                </thead>
+                <tbody id="schedule-table-body"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <section class="ledger-card reveal" id="lenders-target" style="margin-bottom:2.5rem;">
+      <h2 class="card-title">Who's actually cheaper?</h2>
+      <p style="margin-bottom:1rem; font-size:0.95rem; color:var(--text-dim);">Same loan amount and timeline, run through common lending sources — so you can see the gap in plain rupees. Got a quote from someone not listed? Add it below.</p>
+
+      <form id="add-lender-form" onsubmit="addLenderType(event)" style="display:flex; gap:0.6rem; flex-wrap:wrap; align-items:flex-end; margin-bottom:1.5rem; padding:1rem; border:1px dashed var(--hairline); border-radius:8px; background:var(--bg-raised);">
+        <div class="form-group" style="margin-bottom:0; flex:1.4; min-width:180px;">
+          <label for="new-lender-name">Lender name</label>
+          <input type="text" id="new-lender-name" placeholder="e.g. My Uncle's Loan" required style="padding-left:12px;">
+        </div>
+        <div class="form-group" style="margin-bottom:0; flex:0.7; min-width:110px;">
+          <label for="new-lender-rate">Rate quoted (%/yr)</label>
+          <div class="input-wrapper"><span class="input-prefix">%</span><input type="number" id="new-lender-rate" min="0.5" max="500" step="0.5" required></div>
+        </div>
+        <button type="submit" class="btn btn-primary btn-small" style="height:fit-content;">Add Lender</button>
+      </form>
+
+      <div class="table-container">
+        <table>
+          <thead>
+            <tr>
+              <th>Lender type</th>
+              <th>Typical rate</th>
+              <th>Monthly payment</th>
+              <th>Total you'd repay</th>
+              <th>Verdict</th>
+            </tr>
+          </thead>
+          <tbody id="comparison-table-body"></tbody>
+        </table>
+      </div>
+
+      <div class="chart-card">
+        <canvas id="payoff-chart"></canvas>
+        <div class="chart-legend">
+          <span><span class="swatch" style="background:var(--jade);"></span>Cheapest option</span>
+          <span><span class="swatch" style="background:var(--amber);"></span>Standard line</span>
+          <span><span class="swatch" style="background:var(--ember);"></span>Trap to avoid</span>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <!-- ================= LEARN PANEL ================= -->
+  <div id="panel-learn" class="section-panel">
+    <span class="eyebrow">Learn at your own pace</span>
+    <h2 class="card-title" style="font-size:1.8rem; border:none;">Rural Financial Literacy Archive</h2>
+    <p style="color:var(--text-dim); max-width:640px;">Short lessons that unpack how debt actually works, so a bad season doesn't turn into a bad decade.</p>
+
+    <div class="grid-layout">
+      <div class="lesson-card reveal">
+        <div class="video-placeholder"><button class="play-btn" aria-label="Play video instruction"></button></div>
+        <div class="lesson-body">
+          <h3>Breaking the Poverty Cycle</h3>
+          <p>How an emergency loan quietly turns into a debt your children inherit — and where you can break that chain.</p>
+          <a href="#" class="lesson-link">Watch lesson &rarr;</a>
+        </div>
+      </div>
+      <div class="lesson-card reveal">
+        <div class="video-placeholder"><button class="play-btn" aria-label="Play video instruction"></button></div>
+        <div class="lesson-body">
+          <h3>Saving Before You Spend</h3>
+          <p>Simple ways to set aside a little from each harvest before daily costs eat into it.</p>
+          <a href="#" class="lesson-link">Watch lesson &rarr;</a>
+        </div>
+      </div>
+      <div class="lesson-card reveal">
+        <div class="video-placeholder"><button class="play-btn" aria-label="Play video instruction"></button></div>
+        <div class="lesson-body">
+          <h3>Flat Rate vs Reducing Balance</h3>
+          <p>The one difference in how interest is calculated that can cost you tens of thousands of rupees.</p>
+          <a href="#" class="lesson-link">Watch lesson &rarr;</a>
+        </div>
+      </div>
+      <div class="lesson-card reveal">
+        <div class="video-placeholder"><button class="play-btn" aria-label="Play video instruction"></button></div>
+        <div class="lesson-body">
+          <h3>Government Help You Can Actually Get</h3>
+          <p>Subsidies, low-interest farm loans, and legal protections most families never claim.</p>
+          <a href="#" class="lesson-link">Watch lesson &rarr;</a>
+        </div>
+      </div>
+      <div class="lesson-card reveal">
+        <div class="video-placeholder"><button class="play-btn" aria-label="Play video instruction"></button></div>
+        <div class="lesson-body">
+          <h3>Don't Bet the Farm on One Crop</h3>
+          <p>Spreading income across a few small activities so one bad season doesn't wipe you out.</p>
+          <a href="#" class="lesson-link">Watch lesson &rarr;</a>
+        </div>
+      </div>
+      <div class="lesson-card reveal">
+        <div class="video-placeholder"><button class="play-btn" aria-label="Play video instruction"></button></div>
+        <div class="lesson-body">
+          <h3>Is All Debt Bad?</h3>
+          <p>The real difference between a loan that builds something and a loan that just keeps you afloat.</p>
+          <a href="#" class="lesson-link">Watch lesson &rarr;</a>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= GLOSSARY PANEL ================= -->
+  <div id="panel-glossary" class="section-panel">
+    <span class="eyebrow">Plain English, no jargon</span>
+    <h2 class="card-title" style="font-size:1.8rem; border:none;">Terms Decoded</h2>
+    <p style="color:var(--text-dim); max-width:640px; margin-bottom:0.5rem;">Every confusing word used on this site, explained the way you'd explain it to a neighbour.</p>
+
+    <div class="glossary-search">
+      <input type="text" id="glossary-search-input" placeholder="Search a term, e.g. 'EMI' or 'collateral'" oninput="filterGlossary()">
+    </div>
+    <div class="glossary-count" id="glossary-count">Showing all terms</div>
+
+    <div class="glossary-grid" id="glossary-grid"></div>
+    <div class="glossary-empty" id="glossary-empty">No terms match that search. Try a different word.</div>
+  </div>
+
+  <!-- ================= BUDGET PANEL ================= -->
+  <div id="panel-budget" class="section-panel">
+    <span class="eyebrow">Track it before it tracks you</span>
+    <h2 class="card-title" style="font-size:1.8rem; border:none;">The Daily Operational Ledger</h2>
+    <p style="color:var(--text-dim); max-width:640px;">Log what you planned to spend against what actually left your hand — so you don't need a private lender mid-season.</p>
+
+    <div class="budget-grid" style="margin-top:1.5rem;">
+      <div class="ledger-card">
+        <h3 style="font-size:1.1rem; margin-bottom:1rem; padding-bottom:0.75rem; border-bottom:1px solid var(--hairline);">Add an entry</h3>
+        <form id="budget-form" onsubmit="addBudgetLine(event)">
+          <div class="form-group">
+            <label for="b-category">What was it for?</label>
+            <input type="text" id="b-category" placeholder="e.g. Fertiliser, Field labour" required style="padding-left:12px;">
+          </div>
+          <div class="form-group">
+            <label for="b-est">What you planned to spend</label>
+            <div class="input-wrapper"><span class="input-prefix">₹</span><input type="number" id="b-est" min="1" required></div>
+          </div>
+          <div class="form-group">
+            <label for="b-act">What you actually spent</label>
+            <div class="input-wrapper"><span class="input-prefix">₹</span><input type="number" id="b-act" min="1" required></div>
+          </div>
+          <button type="submit" class="btn btn-primary" style="width:100%; margin-top:0.5rem;">Add to Ledger</button>
+        </form>
+      </div>
+
+      <div class="ledger-card">
+        <div class="budget-toolbar">
+          <h3 style="font-size:1.1rem;">Your spending so far</h3>
+          <div style="display:flex; align-items:center; gap:0.75rem;">
+            <span class="saved-tag" id="saved-tag">saved ✓</span>
+            <button class="btn btn-ghost btn-small" onclick="exportBudgetCSV()">Export CSV</button>
+            <button class="btn btn-ghost btn-small" onclick="clearBudget()">Clear all</button>
+          </div>
+        </div>
+        <div class="table-container">
+          <table>
+            <thead>
+              <tr><th>What it's for</th><th>Planned</th><th>Actual</th><th>Difference</th><th></th></tr>
+            </thead>
+            <tbody id="budget-table-body"></tbody>
+            <tfoot>
+              <tr style="font-weight:700; background:var(--bg-raised);">
+                <td>Total</td>
+                <td id="total-est" class="mono">₹0</td>
+                <td id="total-act" class="mono">₹0</td>
+                <td id="total-diff" class="mono">₹0</td>
+                <td></td>
+              </tr>
+            </tfoot>
+          </table>
+          <div id="budget-empty" class="empty-state">Nothing logged yet. Add your first entry to see how your season is tracking.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= FUNDRAISER PANEL ================= -->
+  <div id="panel-fund" class="section-panel fund-panel">
+    <div class="fund-bg-scene" aria-hidden="true">
+      <span class="float-icon" style="left:6%;  font-size:2.2rem; animation-duration:16s; animation-delay:0s;">₹</span>
+      <span class="float-icon" style="left:16%; font-size:1.6rem; animation-duration:13s; animation-delay:2s;">🌾</span>
+      <span class="float-icon" style="left:27%; font-size:1.3rem; animation-duration:19s; animation-delay:5s;">🍃</span>
+      <span class="float-icon" style="left:38%; font-size:2rem;   animation-duration:15s; animation-delay:1s;">🪔</span>
+      <span class="float-icon" style="left:50%; font-size:1.4rem; animation-duration:21s; animation-delay:7s;">🌱</span>
+      <span class="float-icon" style="left:61%; font-size:1.8rem; animation-duration:14s; animation-delay:3s;">₹</span>
+      <span class="float-icon" style="left:72%; font-size:1.5rem; animation-duration:18s; animation-delay:6s;">🌾</span>
+      <span class="float-icon" style="left:83%; font-size:2.1rem; animation-duration:17s; animation-delay:2.5s;">🪔</span>
+      <span class="float-icon" style="left:92%; font-size:1.3rem; animation-duration:20s; animation-delay:8s;">🍃</span>
+    </div>
+
+    <div class="fundraiser-container">
+      <span class="eyebrow">No bank money, no strings</span>
+      <h2 style="font-size:2.1rem; margin-bottom:0.75rem;">Support Cash Crop</h2>
+      <p style="color:var(--text-dim); max-width:520px; margin:0 auto 2rem;">We take zero funding from banks, lenders, or credit companies. Reach out if you'd like to help keep this independent.</p>
+      <a href="#help" class="btn btn-primary" onclick="switchTab('help')">Get in Touch</a>
+    </div>
+  </div>
+
+  <!-- ================= HELP PANEL ================= -->
+  <div id="panel-help" class="section-panel">
+    <div class="faq-layout">
+      <h2 class="card-title" style="font-size:1.8rem; text-align:center; border:none; margin-bottom:1.5rem;">Common Questions</h2>
+
+      <div class="accordion-item">
+        <button class="accordion-trigger" onclick="toggleAccordion(this)">
+          <span>Are these numbers exact?</span><span class="accordion-icon">+</span>
+        </button>
+        <div class="accordion-content"><p>The maths is exact, based on standard loan formulas. What it can't see are extra fees, paperwork charges, or terms buried in fine print — always read your loan agreement fully.</p></div>
+      </div>
+      <div class="accordion-item">
+        <button class="accordion-trigger" onclick="toggleAccordion(this)">
+          <span>What's the real difference between Flat and Reducing?</span><span class="accordion-icon">+</span>
+        </button>
+        <div class="accordion-content"><p>Flat rate charges interest on the full original amount for the whole loan, even after you've paid a lot of it back. Reducing balance only charges interest on what you currently still owe. Reducing balance is almost always cheaper over time.</p></div>
+      </div>
+      <div class="accordion-item">
+        <button class="accordion-trigger" onclick="toggleAccordion(this)">
+          <span>Is my information private?</span><span class="accordion-icon">+</span>
+        </button>
+        <div class="accordion-content"><p>Everything you type stays inside your own browser. Nothing is sent to a server or stored anywhere else.</p></div>
+      </div>
+      <div class="accordion-item">
+        <button class="accordion-trigger" onclick="toggleAccordion(this)">
+          <span>What if I can't repay a loan?</span><span class="accordion-icon">+</span>
+        </button>
+        <div class="accordion-content"><p>Report predatory lending to your regional cooperative bank supervisor or district legal aid office right away. Never take a second high-interest loan just to cover the first — that's how debt traps start.</p></div>
+      </div>
+      <div class="accordion-item">
+        <button class="accordion-trigger" onclick="toggleAccordion(this)">
+          <span>Is this official financial advice?</span><span class="accordion-icon">+</span>
+        </button>
+        <div class="accordion-content"><p>No. This is an educational tool only, not licensed financial or legal advice. Talk to a certified advisor before signing anything binding.</p></div>
+      </div>
+    </div>
+
+    <div class="ledger-card contact-form-box">
+      <h3 class="card-title">Talk to Someone</h3>
+      <form onsubmit="event.preventDefault(); alert('Message logged. A real backend can be wired up here.'); this.reset();">
+        <div class="form-group">
+          <label>Your name</label>
+          <input type="text" placeholder="e.g. Suresh Kumar" required style="padding-left:12px;">
+        </div>
+        <div class="form-group">
+          <label>Phone or email</label>
+          <input type="text" placeholder="e.g. +91 98765 43210" required style="padding-left:12px;">
+        </div>
+        <div class="form-group">
+          <label>What's going on?</label>
+          <textarea rows="4" placeholder="Tell us about any confusing terms or pressure from a lender..." required style="padding-left:12px; width:100%; border:1px solid var(--hairline); background:var(--bg-raised); color:var(--text); font-family:var(--font-body); border-radius:6px; padding:0.7rem;"></textarea>
+        </div>
+        <button type="submit" class="btn btn-primary" style="width:100%;">Send</button>
+      </form>
+    </div>
+  </div>
+
+</main>
+
+<footer>
+  <div class="footer-content">
+    <p class="mono">&copy; 2026 Cash Crop — Independent Rural Financial Toolset.</p>
+    <div class="disclaimer">
+      <strong>Please note:</strong> Cash Crop is an educational tool. It does not provide official financial counselling or legal advice, and using it doesn't create any advisory relationship. Always verify terms before signing a binding loan.
+    </div>
+  </div>
+</footer>
+
+<script>
+  // ============ GLOSSARY DATA ============
+  const GLOSSARY_TERMS = [
+    { term:"EMI", tag:"Payments", def:"Short for Equated Monthly Instalment — the fixed amount you pay every month until a loan is fully repaid." },
+    { term:"Principal", tag:"Payments", def:"The original amount of money you borrowed, before any interest is added." },
+    { term:"Interest Rate", tag:"Payments", def:"The extra percentage a lender charges you for the use of their money, usually shown as a rate per year." },
+    { term:"Tenure", tag:"Payments", def:"How long you have to repay a loan, usually counted in months." },
+    { term:"Flat Rate Interest", tag:"Interest types", def:"A way of charging interest on the full original loan amount for the entire loan period — even after you've paid a lot of it back. This usually costs more overall." },
+    { term:"Reducing Balance", tag:"Interest types", def:"A way of charging interest only on the amount you still owe right now, not the full original loan. As you repay, the interest gets smaller too. Usually cheaper than flat rate." },
+    { term:"Amortization", tag:"Interest types", def:"The process of paying off a loan gradually through regular payments, each one covering some interest and some principal." },
+    { term:"Amortization Schedule", tag:"Interest types", def:"A month-by-month table showing exactly how much of each payment goes to interest, how much goes to principal, and how much you still owe." },
+    { term:"Collateral", tag:"Loan basics", def:"Something valuable — like land, jewellery, or equipment — that you promise to a lender. If you can't repay, they can take it instead." },
+    { term:"Default", tag:"Loan basics", def:"What happens when you fail to make a loan payment on time or fail to repay the loan at all." },
+    { term:"Moneylender", tag:"Lenders", def:"A private individual who lends cash directly, often with very few rules and very high interest rates. Some are fair, many are not." },
+    { term:"Predatory Lending", tag:"Lenders", def:"Lending designed to trap borrowers — through hidden fees, extreme interest rates, or unfair terms that make a loan nearly impossible to escape." },
+    { term:"Microfinance", tag:"Lenders", def:"Small loans given to people who don't usually qualify for a traditional bank loan, often aimed at helping a small business or farm get started." },
+    { term:"Cooperative Society", tag:"Lenders", def:"A lender owned and run by its own members — often farmers or villagers — usually offering fairer rates than private lenders." },
+    { term:"Self-Help Group (SHG)", tag:"Lenders", def:"A small group of people, often neighbours, who pool their own savings and lend to each other at low or no interest." },
+    { term:"Subsidy", tag:"Government help", def:"Money or a discount given by the government to make something — like a farm loan — cheaper for the person receiving it." },
+    { term:"Legal Aid", tag:"Government help", def:"Free or low-cost legal help provided to people who can't afford a lawyer, useful if a lender is treating you unfairly." },
+    { term:"Debt Trap", tag:"Risk", def:"A cycle where you borrow again just to repay an existing loan, and the debt keeps growing instead of shrinking." },
+    { term:"Interest Rate Cap", tag:"Risk", def:"A legal limit on how much interest a lender is allowed to charge, meant to protect borrowers from extreme rates." },
+    { term:"Diminishing Balance", tag:"Interest types", def:"Another name for reducing balance — interest calculated only on what's left to repay, not the original full amount." }
+  ];
+
+  function renderGlossary(){
+    const grid = document.getElementById('glossary-grid');
+    grid.innerHTML = GLOSSARY_TERMS.map(t => `
+      <div class="term-card" data-term="${t.term.toLowerCase()}" data-def="${t.def.toLowerCase()}">
+        <span class="term-tag">${t.tag}</span>
+        <div class="term-name">${t.term}</div>
+        <p>${t.def}</p>
+      </div>
+    `).join('');
+  }
+
+  function filterGlossary(){
+    const q = document.getElementById('glossary-search-input').value.trim().toLowerCase();
+    const cards = document.querySelectorAll('.term-card');
+    let visibleCount = 0;
+    cards.forEach(card => {
+      const match = !q || card.dataset.term.includes(q) || card.dataset.def.includes(q);
+      card.classList.toggle('hidden', !match);
+      if(match) visibleCount++;
+    });
+    document.getElementById('glossary-count').innerText = q
+      ? `Showing ${visibleCount} of ${cards.length} terms`
+      : `Showing all ${cards.length} terms`;
+    document.getElementById('glossary-empty').style.display = visibleCount === 0 ? 'block' : 'none';
+  }
+
+  // ============ LENDER DATA ============
+  let currentCalcMethod = 'reducing';
+  let LENDER_ARCHITECTURES = [
+    { name:'Nationalised Bank', rate:7, block:false, custom:false },
+    { name:'Regional Agricultural Bank', rate:9, block:false, custom:false },
+    { name:'District Cooperative Society', rate:12, block:false, custom:false },
+    { name:'Self-Help Group Pool', rate:15, block:false, custom:false },
+    { name:'Microfinance Company', rate:21, block:false, custom:false },
+    { name:'Local Private Moneylender', rate:48, block:true, custom:false }
+  ];
+
+  function addLenderType(e){
+    e.preventDefault();
+    const nameEl = document.getElementById('new-lender-name');
+    const rateEl = document.getElementById('new-lender-rate');
+    const name = nameEl.value.trim();
+    const rate = parseFloat(rateEl.value);
+    if(!name || !rate) return;
+    LENDER_ARCHITECTURES.push({ name, rate, block: rate >= 40, custom:true });
+    nameEl.value = ''; rateEl.value = '';
+    processCalculations();
+  }
+
+  function removeLenderType(index){
+    LENDER_ARCHITECTURES.splice(index, 1);
+    processCalculations();
+  }
+
+  let budgetEntries = [];
+  const BUDGET_STORAGE_KEY = 'cashcrop_budget_entries_v1';
+
+  // ============ EMBER CURSOR (canvas) ============
+  const canvas = document.getElementById('ember-canvas');
+  const ctx = canvas.getContext('2d');
+  let mouse = { x: innerWidth/2, y: innerHeight/2, active:false };
+  let target = { x: innerWidth/2, y: innerHeight/2 };
+  let embers = [];
+
+  function resizeCanvas(){ canvas.width = innerWidth; canvas.height = innerHeight; }
+  addEventListener('resize', resizeCanvas);
+  resizeCanvas();
+
+  addEventListener('mousemove', e => { target.x = e.clientX; target.y = e.clientY; mouse.active = true; });
+  addEventListener('mouseleave', () => { mouse.active = false; });
+
+  function spawnEmber(x,y){
+    if(embers.length > 45) return;
+    embers.push({
+      x, y,
+      vx: (Math.random()-0.5) * 0.6,
+      vy: -Math.random()*0.8 - 0.2,
+      alpha: 1,
+      size: Math.random()*2 + 1,
+      color: Math.random() > 0.35 ? '#E2993B' : '#C1451F'
+    });
+  }
+
+  function renderCursor(){
+    ctx.clearRect(0,0,canvas.width,canvas.height);
+    mouse.x += (target.x - mouse.x) * 0.22;
+    mouse.y += (target.y - mouse.y) * 0.22;
+
+    if(mouse.active){
+      const cx = mouse.x, cy = mouse.y;
+      const glow = ctx.createRadialGradient(cx,cy,0,cx,cy,16);
+      glow.addColorStop(0, 'rgba(226,153,59,0.55)');
+      glow.addColorStop(1, 'rgba(226,153,59,0)');
+      ctx.fillStyle = glow;
+      ctx.beginPath(); ctx.arc(cx,cy,16,0,Math.PI*2); ctx.fill();
+
+      ctx.strokeStyle = 'rgba(236,227,210,0.7)';
+      ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.arc(cx,cy,4,0,Math.PI*2); ctx.stroke();
+
+      if(Math.abs(target.x - mouse.x) > 0.3 || Math.abs(target.y - mouse.y) > 0.3){
+        spawnEmber(cx,cy);
+      }
+    }
+
+    for(let i = embers.length - 1; i >= 0; i--){
+      const p = embers[i];
+      p.x += p.vx; p.y += p.vy; p.alpha -= 0.018;
+      if(p.alpha <= 0){ embers.splice(i,1); continue; }
+      ctx.fillStyle = p.color;
+      ctx.globalAlpha = p.alpha;
+      ctx.beginPath(); ctx.arc(p.x, p.y, p.size, 0, Math.PI*2); ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+    requestAnimationFrame(renderCursor);
+  }
+  requestAnimationFrame(renderCursor);
+
+  // ============ 3D TILT INTERACTION ============
+  function initTilt(selector, maxTilt){
+    const cards = document.querySelectorAll(selector);
+    cards.forEach(card => {
+      card.addEventListener('mousemove', e => {
+        const r = card.getBoundingClientRect();
+        const px = (e.clientX - r.left) / r.width - 0.5;
+        const py = (e.clientY - r.top) / r.height - 0.5;
+        card.style.transform = `perspective(900px) rotateX(${(-py*maxTilt).toFixed(2)}deg) rotateY(${(px*maxTilt).toFixed(2)}deg) translateZ(4px)`;
+      });
+      card.addEventListener('mouseleave', () => { card.style.transform = ''; });
+    });
+  }
+
+  function setupTiltInteractions(){
+    if(matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    if(matchMedia('(pointer: coarse)').matches) return; // skip on touch devices
+    initTilt('.ledger-card', 4);
+    initTilt('.lesson-card', 7);
+    initTilt('.term-card', 6);
+    initTilt('.tier-card', 6);
+  }
+
+  // ============ NAVIGATION ============
+  function switchTab(targetId){
+    document.querySelectorAll('.section-panel').forEach(p => p.classList.remove('active'));
+    document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+    const panel = document.getElementById(`panel-${targetId}`);
+    const tab = document.getElementById(`tab-${targetId}`);
+    if(panel && tab){
+      panel.classList.add('active');
+      tab.classList.add('active');
+      scrollTo({ top:0 });
+      if(targetId === 'fund') setTimeout(triggerFundraiserAnimation, 200);
+      if(targetId === 'home') setTimeout(drawPayoffChart, 50);
+      triggerScrollReveal();
+    }
+  }
+
+  // ============ CALCULATOR ENGINE ============
+  const inputAmount = document.getElementById('calc-amount');
+  const inputRate = document.getElementById('calc-rate');
+  const inputTenure = document.getElementById('calc-tenure');
+
+  function setCalcMethod(method){
+    currentCalcMethod = method;
+    document.getElementById('type-reducing').classList.toggle('active', method === 'reducing');
+    document.getElementById('type-flat').classList.toggle('active', method === 'flat');
+    processCalculations();
+  }
+
+  [inputAmount, inputRate, inputTenure].forEach(el => el.addEventListener('input', processCalculations));
+
+  function animateNumberValue(id, targetValue, isCurrency = true){
+    const el = document.getElementById(id);
+    if(!el) return;
+    if(matchMedia('(prefers-reduced-motion: reduce)').matches){
+      el.innerText = isCurrency ? `₹${Math.round(targetValue).toLocaleString('en-IN')}` : `${targetValue}%`;
+      return;
+    }
+    const start = parseFloat(el.innerText.replace(/[^0-9.-]/g,'')) || 0;
+    const duration = 350;
+    const t0 = performance.now();
+    function step(now){
+      const p = Math.min((now - t0) / duration, 1);
+      const val = start + p * (targetValue - start);
+      el.innerText = isCurrency ? `₹${Math.round(val).toLocaleString('en-IN')}` : `${val.toFixed(1)}%`;
+      if(p < 1) requestAnimationFrame(step);
+    }
+    requestAnimationFrame(step);
+  }
+
+  function computeLoan(P, annualR, N, method){
+    const monthlyR = (annualR/12)/100;
+    let emi, totalRepay, totalInterest;
+    if(method === 'reducing'){
+      emi = monthlyR === 0 ? P/N : P * monthlyR * Math.pow(1+monthlyR, N) / (Math.pow(1+monthlyR, N) - 1);
+      totalRepay = emi * N;
+      totalInterest = totalRepay - P;
+    } else {
+      totalInterest = P * (annualR/100) * (N/12);
+      totalRepay = P + totalInterest;
+      emi = totalRepay / N;
+    }
+    return { emi, totalRepay, totalInterest };
+  }
+
+  function processCalculations(){
+    const P = parseFloat(inputAmount.value) || 0;
+    const annualR = parseFloat(inputRate.value) || 0;
+    const N = parseInt(inputTenure.value) || 0;
+
+    let emi = 0, totalRepay = 0, totalInterest = 0;
+    if(P > 0 && annualR > 0 && N > 0){
+      ({ emi, totalRepay, totalInterest } = computeLoan(P, annualR, N, currentCalcMethod));
+    }
+
+    animateNumberValue('out-emi', emi);
+    animateNumberValue('out-interest', totalInterest);
+    animateNumberValue('out-total', totalRepay);
+
+    const realCostPct = totalRepay > 0 ? ((totalRepay - P) / P) * 100 : 0;
+    animateNumberValue('stamp-pct', realCostPct, false);
+
+    const seal = document.getElementById('hero-stamp');
+    seal.classList.remove('pulse'); void seal.offsetWidth; seal.classList.add('pulse');
+
+    updateDebtFreeDate(N);
+    generateComparisonMatrix(P, N);
+    buildAmortizationSchedule(P, annualR, N, currentCalcMethod, emi);
+    drawPayoffChart();
+  }
+
+  function updateDebtFreeDate(N){
+    const el = document.getElementById('debtfree-date');
+    if(!N || N <= 0){ el.innerText = '—'; return; }
+    const d = new Date();
+    d.setMonth(d.getMonth() + N);
+    el.innerText = d.toLocaleDateString('en-IN', { month:'long', year:'numeric' });
+  }
+
+  function generateComparisonMatrix(principal, months){
+    const tbody = document.getElementById('comparison-table-body');
+    tbody.innerHTML = '';
+    if(principal <= 0 || months <= 0) return;
+
+    let cheapest = Infinity, priciest = -Infinity;
+    const rows = LENDER_ARCHITECTURES.map((lender, idx) => {
+      const { emi, totalRepay } = computeLoan(principal, lender.rate, months, 'reducing');
+      if(totalRepay < cheapest) cheapest = totalRepay;
+      if(totalRepay > priciest) priciest = totalRepay;
+      return { lender, emi, totalRepay, idx };
+    });
+
+    rows.forEach(row => {
+      const tr = document.createElement('tr');
+      let cls = '', tag = '';
+      if(row.totalRepay === cheapest){ cls = 'highlight-cheapest'; tag = '<span class="badge badge-green">Best value</span>'; }
+      else if(row.lender.block || row.totalRepay === priciest){ cls = 'highlight-expensive'; tag = '<span class="badge badge-red">Avoid</span>'; }
+      else { tag = '<span class="badge badge-neutral">Standard</span>'; }
+      tr.className = cls;
+      const removeBtn = row.lender.custom ? `<button class="btn-delete" onclick="removeLenderType(${row.idx})" title="Remove this lender" style="margin-left:0.5rem;">✕</button>` : '';
+      tr.innerHTML = `
+        <td style="font-weight:600;">${row.lender.name}${row.lender.custom ? ' <span class="badge badge-neutral" style="margin-left:0.4rem;">Yours</span>' : ''}</td>
+        <td class="mono">${row.lender.rate}%</td>
+        <td class="mono">₹${Math.round(row.emi).toLocaleString('en-IN')}</td>
+        <td class="mono" style="font-weight:600;">₹${Math.round(row.totalRepay).toLocaleString('en-IN')}</td>
+        <td>${tag}${removeBtn}</td>
+      `;
+      tbody.appendChild(tr);
+    });
+  }
+
+  function buildAmortizationSchedule(P, annualR, N, method, emi){
+    const tbody = document.getElementById('schedule-table-body');
+    tbody.innerHTML = '';
+    if(P <= 0 || annualR <= 0 || N <= 0) return;
+
+    const monthlyR = (annualR/12)/100;
+    let balance = P;
+
+    if(method === 'reducing'){
+      for(let m = 1; m <= N; m++){
+        const interestPortion = balance * monthlyR;
+        let principalPortion = emi - interestPortion;
+        if(m === N) principalPortion = balance;
+        balance = Math.max(balance - principalPortion, 0);
+        appendScheduleRow(tbody, m, emi, interestPortion, principalPortion, balance);
+      }
+    } else {
+      const flatInterestPerMonth = (P * (annualR/100)) / 12;
+      const principalPerMonth = P / N;
+      for(let m = 1; m <= N; m++){
+        balance = Math.max(balance - principalPerMonth, 0);
+        appendScheduleRow(tbody, m, emi, flatInterestPerMonth, principalPerMonth, balance);
+      }
+    }
+  }
+
+  function appendScheduleRow(tbody, m, emi, interest, principal, balance){
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td class="mono">${m}</td>
+      <td class="mono">₹${Math.round(emi).toLocaleString('en-IN')}</td>
+      <td class="mono">₹${Math.round(interest).toLocaleString('en-IN')}</td>
+      <td class="mono">₹${Math.round(principal).toLocaleString('en-IN')}</td>
+      <td class="mono">₹${Math.round(balance).toLocaleString('en-IN')}</td>
+    `;
+    tbody.appendChild(tr);
+  }
+
+  function toggleSchedule(){
+    const wrap = document.getElementById('schedule-wrap');
+    const btn = document.getElementById('schedule-btn');
+    const open = wrap.classList.toggle('open');
+    btn.innerText = open ? 'Hide month-by-month schedule ▴' : 'Show month-by-month schedule ▾';
+  }
+
+  // ============ PAYOFF BAR CHART ============
+  function drawPayoffChart(){
+    const canvasEl = document.getElementById('payoff-chart');
+    if(!canvasEl) return;
+    const dpr = window.devicePixelRatio || 1;
+    const rect = canvasEl.getBoundingClientRect();
+    if(rect.width === 0) return;
+    canvasEl.width = rect.width * dpr;
+    canvasEl.height = 260 * dpr;
+    const c = canvasEl.getContext('2d');
+    c.scale(dpr, dpr);
+    c.clearRect(0,0,rect.width,260);
+
+    const P = parseFloat(inputAmount.value) || 0;
+    const N = parseInt(inputTenure.value) || 0;
+    if(P <= 0 || N <= 0) return;
+
+    const rows = LENDER_ARCHITECTURES.map(l => computeLoan(P, l.rate, N, 'reducing').totalRepay);
+    const maxVal = Math.max(...rows) * 1.05;
+    const cheapest = Math.min(...rows);
+    const priciest = Math.max(...rows);
+
+    const barHeight = 26;
+    const gap = 12;
+    const leftPad = 170;
+    const rightPad = 90;
+
+    LENDER_ARCHITECTURES.forEach((lender, i) => {
+      const val = rows[i];
+      const y = i * (barHeight + gap) + 6;
+      const w = ((val / maxVal) * (rect.width - leftPad - rightPad));
+
+      let color = 'var(--amber)';
+      if(val === cheapest) color = '#3E9C85';
+      else if(lender.block || val === priciest) color = '#C1451F';
+      else color = '#E2993B';
+
+      c.fillStyle = '#A79C87';
+      c.font = '12px "JetBrains Mono", monospace';
+      c.textAlign = 'right';
+      c.textBaseline = 'middle';
+      c.fillText(lender.name.length > 22 ? lender.name.slice(0,20)+'…' : lender.name, leftPad - 12, y + barHeight/2);
+
+      c.fillStyle = color;
+      roundRect(c, leftPad, y, Math.max(w,2), barHeight, 4);
+      c.fill();
+
+      c.fillStyle = '#ECE3D2';
+      c.textAlign = 'left';
+      c.fillText('₹' + Math.round(val).toLocaleString('en-IN'), leftPad + w + 10, y + barHeight/2);
+    });
+  }
+
+  function roundRect(ctx, x, y, w, h, r){
+    ctx.beginPath();
+    ctx.moveTo(x+r,y);
+    ctx.arcTo(x+w,y,x+w,y+h,r);
+    ctx.arcTo(x+w,y+h,x,y+h,r);
+    ctx.arcTo(x,y+h,x,y,r);
+    ctx.arcTo(x,y,x+w,y,r);
+    ctx.closePath();
+  }
+
+  // ============ BUDGET LEDGER (persisted) ============
+  function loadBudgetEntries(){
+    try{
+      const raw = localStorage.getItem(BUDGET_STORAGE_KEY);
+      budgetEntries = raw ? JSON.parse(raw) : [];
+    } catch(e){ budgetEntries = []; }
+  }
+
+  function saveBudgetEntries(){
+    try{
+      localStorage.setItem(BUDGET_STORAGE_KEY, JSON.stringify(budgetEntries));
+      const tag = document.getElementById('saved-tag');
+      tag.classList.add('show');
+      setTimeout(() => tag.classList.remove('show'), 1200);
+    } catch(e){ /* storage unavailable, ignore silently */ }
+  }
+
+  function updateBudgetDisplay(){
+    const tbody = document.getElementById('budget-table-body');
+    const emptyState = document.getElementById('budget-empty');
+    tbody.innerHTML = '';
+
+    if(budgetEntries.length === 0){
+      emptyState.style.display = 'block';
+      document.getElementById('total-est').innerText = '₹0';
+      document.getElementById('total-act').innerText = '₹0';
+      document.getElementById('total-diff').innerText = '₹0';
+      return;
+    }
+    emptyState.style.display = 'none';
+
+    let sumEst = 0, sumAct = 0;
+    budgetEntries.forEach((entry, idx) => {
+      sumEst += entry.est; sumAct += entry.act;
+      const delta = entry.est - entry.act;
+      const isOver = entry.act > entry.est;
+      const pctAct = Math.min((entry.act / entry.est) * 100, 100);
+
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td style="font-weight:600;">
+          ${escapeHtml(entry.category)}
+          <div class="bar-comparison-track">
+            <div class="bar-fill-estimated" style="width:100%"></div>
+            <div class="bar-fill-actual ${isOver ? 'over-budget' : ''}" style="width:${pctAct}%"></div>
+          </div>
+        </td>
+        <td class="mono">₹${entry.est.toLocaleString('en-IN')}</td>
+        <td class="mono">₹${entry.act.toLocaleString('en-IN')}</td>
+        <td class="mono" style="font-weight:600; color:${delta >= 0 ? 'var(--jade)' : 'var(--ember)'}">
+          ${delta >= 0 ? '+₹' + delta.toLocaleString('en-IN') : '-₹' + Math.abs(delta).toLocaleString('en-IN')}
+        </td>
+        <td><button class="btn-delete" onclick="dropBudgetLine(${idx})">Remove</button></td>
+      `;
+      tbody.appendChild(tr);
+    });
+
+    const globalDelta = sumEst - sumAct;
+    document.getElementById('total-est').innerText = `₹${sumEst.toLocaleString('en-IN')}`;
+    document.getElementById('total-act').innerText = `₹${sumAct.toLocaleString('en-IN')}`;
+    const diffEl = document.getElementById('total-diff');
+    diffEl.innerText = globalDelta >= 0 ? `+₹${globalDelta.toLocaleString('en-IN')}` : `-₹${Math.abs(globalDelta).toLocaleString('en-IN')}`;
+    diffEl.style.color = globalDelta >= 0 ? 'var(--jade)' : 'var(--ember)';
+  }
+
+  function addBudgetLine(e){
+    e.preventDefault();
+    const catEl = document.getElementById('b-category');
+    const estEl = document.getElementById('b-est');
+    const actEl = document.getElementById('b-act');
+    budgetEntries.push({ category: catEl.value, est: parseFloat(estEl.value) || 0, act: parseFloat(actEl.value) || 0 });
+    catEl.value = ''; estEl.value = ''; actEl.value = '';
+    saveBudgetEntries();
+    updateBudgetDisplay();
+  }
+
+  function dropBudgetLine(index){
+    budgetEntries.splice(index, 1);
+    saveBudgetEntries();
+    updateBudgetDisplay();
+  }
+
+  function clearBudget(){
+    if(budgetEntries.length && !confirm('Clear all logged entries? This cannot be undone.')) return;
+    budgetEntries = [];
+    saveBudgetEntries();
+    updateBudgetDisplay();
+  }
+
+  function exportBudgetCSV(){
+    if(budgetEntries.length === 0){ alert('Nothing to export yet.'); return; }
+    let csv = 'Category,Planned,Actual,Difference\n';
+    budgetEntries.forEach(e => { csv += `${e.category.replace(/,/g,' ')},${e.est},${e.act},${e.est - e.act}\n`; });
+    const blob = new Blob([csv], { type:'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = 'cash-crop-ledger.csv';
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  function escapeHtml(text){ return text.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"); }
+
+  // ============ ACCORDION ============
+  function toggleAccordion(trigger){
+    const item = trigger.parentElement;
+    const content = item.querySelector('.accordion-content');
+    const isOpen = item.classList.contains('open');
+    document.querySelectorAll('.accordion-item').forEach(el => {
+      el.classList.remove('open');
+      el.querySelector('.accordion-content').style.maxHeight = null;
+    });
+    if(!isOpen){ item.classList.add('open'); content.style.maxHeight = content.scrollHeight + 'px'; }
+  }
+
+  // ============ FUNDRAISER + SCROLL REVEAL ============
+  function triggerFundraiserAnimation(){
+    const fill = document.getElementById('fund-progress');
+    if(fill) fill.style.width = '47.5%';
+  }
+
+  function triggerScrollReveal(){
+    document.querySelectorAll('.reveal').forEach(block => {
+      const bounding = block.getBoundingClientRect();
+      if(bounding.top < innerHeight * 0.92) block.classList.add('visible');
+    });
+  }
+  addEventListener('scroll', triggerScrollReveal);
+  addEventListener('resize', () => drawPayoffChart());
+
+  // ============ PAGE LOAD ============
+  addEventListener('DOMContentLoaded', () => {
+    loadBudgetEntries();
+    renderGlossary();
+    processCalculations();
+    updateBudgetDisplay();
+    setupTiltInteractions();
+
+    if(!matchMedia('(prefers-reduced-motion: reduce)').matches){
+      const headline = document.getElementById('hero-headline');
+      const subtext = document.getElementById('hero-subtext');
+      const actions = document.getElementById('hero-actions');
+      const seal = document.getElementById('hero-stamp');
+
+      setTimeout(() => { headline.style.transition = 'transform 0.6s var(--ease), opacity 0.6s var(--ease)'; headline.style.opacity = '1'; headline.style.transform = 'translateY(0)'; }, 100);
+      setTimeout(() => { subtext.style.transition = 'transform 0.6s var(--ease), opacity 0.6s var(--ease)'; subtext.style.opacity = '1'; subtext.style.transform = 'translateY(0)'; }, 250);
+      setTimeout(() => { actions.style.transition = 'transform 0.6s var(--ease), opacity 0.6s var(--ease)'; actions.style.opacity = '1'; actions.style.transform = 'translateY(0)'; }, 400);
+      setTimeout(() => { seal.classList.add('lit'); }, 600);
+    } else {
+      document.getElementById('hero-headline').style.opacity = '1';
+      document.getElementById('hero-headline').style.transform = 'none';
+      document.getElementById('hero-subtext').style.opacity = '1';
+      document.getElementById('hero-subtext').style.transform = 'none';
+      document.getElementById('hero-actions').style.opacity = '1';
+      document.getElementById('hero-actions').style.transform = 'none';
+      document.getElementById('hero-stamp').classList.add('lit');
+    }
+
+    setTimeout(() => { triggerScrollReveal(); drawPayoffChart(); }, 200);
+  });
+</script>
+</body>
+</html>
